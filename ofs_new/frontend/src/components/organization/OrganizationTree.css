@@ -1,0 +1,149 @@
+.organization-tree-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 80px);
+  width: 100%;
+  overflow: hidden;
+}
+
+.organization-tree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.organization-tree-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.relation-toggles {
+  display: flex;
+  gap: 8px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.organization-tree-graph {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #fafafa;
+}
+
+.loading-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-graph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #757575;
+  font-size: 18px;
+}
+
+/* Стили для узлов с разным уровнем */
+.reactflow__node {
+  transition: transform 0.3s ease;
+}
+
+.reactflow__node.selected {
+  z-index: 10;
+}
+
+/* Стили для линий соединений */
+.reactflow__edge {
+  z-index: 1;
+}
+
+.reactflow__edge.animated .reactflow__edge-path {
+  stroke-dasharray: 5;
+  animation: flow 30s linear infinite;
+}
+
+.reactflow__edge.administrative .reactflow__edge-path {
+  stroke: #3f51b5;
+  stroke-width: 2;
+}
+
+.reactflow__edge.functional .reactflow__edge-path {
+  stroke: #f50057;
+  stroke-width: 2;
+  stroke-dasharray: 5;
+}
+
+/* Стили для элементов управления React Flow */
+.reactflow__controls {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.reactflow__controls-button {
+  background-color: white;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  border-radius: 0;
+}
+
+.reactflow__controls-button:first-child {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.reactflow__controls-button:last-child {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-bottom: none;
+}
+
+.reactflow__attribution {
+  background-color: transparent;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+  .organization-tree-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .organization-tree-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .organization-select {
+    width: 100%;
+  }
+  
+  .relation-toggles, .action-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+} 

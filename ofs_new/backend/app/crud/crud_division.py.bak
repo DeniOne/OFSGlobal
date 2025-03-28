@@ -1,0 +1,261 @@
+from typing import List, Dict, Any, Optional, Union, Tuple
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import true
+
+from app.crud.base import CRUDBase
+from app.models.division import Division
+from app.schemas.division import DivisionCreate, DivisionUpdate
+
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+from sqlalchemy.orm import joinedload
+
+
+class CRUDDivision(CRUDBase[Division, DivisionCreate, DivisionUpdate]):
+    """
+    CRUD операции с отделами/подразделениями.
+    """
+    
+    def get_by_name(self, db: Session, *, name: str, organization_id: int) -> Optional[Division]:
+        """
+        Получить подразделение по названию и организации.
+        """
+        return db.query(Division).filter(
+            Division.name == name,
+            Division.organization_id == organization_id
+        ).first()
+    
+    async def get_by_code(
+        self, db: AsyncSession, *, code: str, organization_id: int
+    ) -> Optional[Division]:
+        """
+        Получение подразделения по коду в рамках указанной организации
+        """
+        result = await db.execute(
+            select(Division)
+            .where(
+                and_(
+                    Division.code == code,
+                    Division.organization_id == organization_id
+                )
+            )
+        )
+        return result.scalars().first()
+    
+    def get_multi_by_organization(
+        self, db: Session, *, organization_id: int, skip: int = 0, limit: int = 100,
+        name: Optional[str] = None, code: Optional[str] = None, active: Optional[bool] = None,
+        level: Optional[int] = None
+    ) -> List[Division]:
+        """
+        Получить список подразделений по организации с возможностью фильтрации.
+        """
+        query = db.query(self.model).filter(Division.organization_id == organization_id)
+        
+        if name:
+            query = query.filter(Division.name.ilike(f"%{name}%"))
+        
+        if code:
+            query = query.filter(Division.code.ilike(f"%{code}%"))
+        
+        if active is not None:
+            query = query.filter(Division.is_active == active)
+        
+        if level is not None:
+            query = query.filter(Division.level == level)
+            
+        return query.offset(skip).limit(limit).all()
+    
+    async def get_multi_by_organization(
+        self, 
+        db: AsyncSession, 
+        *, 
+        organization_id: int,
+        parent_id: Optional[int] = None,
+        include_inactive: bool = False,
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Division]:
+        """
+        Получение подразделений для указанной организации
+        Если parent_id указан, возвращаются только дочерние подразделения
+        Если parent_id = None, возвращаются корневые подразделения (без родителя)
+        """
+        filters = [Division.organization_id == organization_id]
+        
+        # Фильтрация по родительскому подразделению
+        filters.append(Division.parent_id == parent_id)
+        
+        # Фильтрация по активности
+        if not include_inactive:
+            filters.append(Division.is_active == True)
+        
+        result = await db.execute(
+            select(Division)
+            .where(and_(*filters))
+            .offset(skip)
+            .limit(limit)
+        )
+        return result.scalars().all()
+    
+    def get_children(self, db: Session, *, division_id: int, active_only: bool = False) -> List[Division]:
+        """
+        Получить все дочерние подразделения для указанного подразделения.
+        """
+        query = db.query(self.model).filter(Division.parent_id == division_id)
+        
+        if active_only:
+            query = query.filter(Division.is_active == True)
+            
+        return query.all()
+    
+    async def get_children(
+        self, 
+        db: AsyncSession, 
+        *, 
+        division_id: int,
+        include_inactive: bool = False
+    ) -> List[Division]:
+        """
+        Получение прямых дочерних подразделений для указанного подразделения
+        """
+        filters = [Division.parent_id == division_id]
+        
+        if not include_inactive:
+            filters.append(Division.is_active == True)
+        
+        result = await db.execute(
+            select(Division)
+            .where(and_(*filters))
+        )
+        return result.scalars().all()
+    
+    def get_root_divisions(self, db: Session, *, organization_id: int) -> List[Division]:
+        """
+        Получить корневые подразделения организации (без родительского подразделения).
+        """
+        return db.query(self.model).filter(
+            Division.organization_id == organization_id,
+            Division.parent_id == None
+        ).all()
+    
+    async def get_all_descendants(
+        self, 
+        db: AsyncSession, 
+        *, 
+        division_id: int,
+        include_inactive: bool = False
+    ) -> List[Division]:
+        """
+        Получение всех потомков подразделения (всех уровней иерархии)
+        """
+        # Получаем прямых потомков
+        children = await self.get_children(db, division_id=division_id, include_inactive=include_inactive)
+        
+        descendants = list(children)  # Копируем список чтобы не менять его при проходе
+        
+        # Для каждого дочернего подразделения получаем его потомков
+        for child in children:
+            child_descendants = await self.get_all_descendants(
+                db, division_id=child.id, include_inactive=include_inactive
+            )
+            descendants.extend(child_descendants)
+        
+        return descendants
+    
+    async def get_division_tree(
+        self, 
+        db: AsyncSession, 
+        *, 
+        organization_id: int,
+        include_inactive: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Построение дерева подразделений для организации
+        """
+        # Получаем все подразделения организации
+        filters = [Division.organization_id == organization_id]
+        if not include_inactive:
+            filters.append(Division.is_active == True)
+            
+        result = await db.execute(
+            select(Division)
+            .where(and_(*filters))
+            .order_by(Division.level)
+        )
+        all_divisions = result.scalars().all()
+        
+        # Строим дерево подразделений
+        divisions_by_id = {div.id: div for div in all_divisions}
+        tree = []
+        for div in all_divisions:
+            # Устанавливаем дочерние подразделения
+            div_dict = jsonable_encoder(div)
+            div_dict["children"] = []
+            
+            # Если подразделение без родителя, добавляем в корень дерева
+            if div.parent_id is None:
+                tree.append(div_dict)
+            # Иначе добавляем как дочерний
+            elif div.parent_id in divisions_by_id:
+                parent = divisions_by_id[div.parent_id]
+                # Находим родителя в дереве
+                parent_dict = None
+                for d in tree:
+                    if d["id"] == parent.id:
+                        parent_dict = d
+                        break
+                
+                # Если родитель найден, добавляем к нему
+                if parent_dict:
+                    parent_dict["children"].append(div_dict)
+                # Иначе родитель может быть на более глубоком уровне
+                else:
+                    # Рекурсивный поиск родителя в дереве
+                    def find_parent_and_add_child(nodes, child_dict):
+                        for node in nodes:
+                            if node["id"] == parent.id:
+                                node["children"].append(child_dict)
+                                return True
+                            if find_parent_and_add_child(node["children"], child_dict):
+                                return True
+                        return False
+                    
+                    find_parent_and_add_child(tree, div_dict)
+        
+        return tree
+    
+    async def create_with_parent(
+        self, 
+        db: AsyncSession, 
+        *, 
+        obj_in: BaseModel,
+        parent_id: Optional[int] = None
+    ) -> Division:
+        """
+        Создание подразделения с учетом родительского подразделения
+        """
+        obj_in_data = jsonable_encoder(obj_in)
+        level = 0  # Уровень по умолчанию для корневых подразделений
+        
+        # Если указан parent_id, устанавливаем правильный уровень
+        if parent_id is not None:
+            parent = await self.get(db, id=parent_id)
+            if parent:
+                level = parent.level + 1
+                obj_in_data["parent_id"] = parent_id
+        
+        obj_in_data["level"] = level
+        
+        db_obj = self.model(**obj_in_data)
+        db.add(db_obj)
+        await db.commit()
+        await db.refresh(db_obj)
+        return db_obj
+
+
+division = CRUDDivision(Division) d i v i s i o n   =   C R U D D i v i s i o n ( D i v i s i o n ) 
+ 
+ 

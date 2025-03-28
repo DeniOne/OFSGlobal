@@ -1,0 +1,37 @@
+.drawer-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  min-height: 64px;
+}
+
+.drawer-logo {
+  margin-right: 12px;
+}
+
+.bottom-menu {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Стили для активных пунктов меню */
+.MuiListItemButton-root.Mui-selected {
+  background-color: rgba(25, 118, 210, 0.12);
+}
+
+.MuiListItemButton-root.Mui-selected .MuiListItemIcon-root {
+  color: #1976d2;
+}
+
+.MuiListItemButton-root.Mui-selected .MuiTypography-root {
+  font-weight: 500;
+}
+
+/* Адаптивные стили */
+@media (max-width: 600px) {
+  .drawer-header {
+    min-height: 56px;
+  }
+} 
