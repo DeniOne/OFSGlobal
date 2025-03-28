@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './styles/App.css';
 
 import MainLayout from './components/layout/MainLayout';
@@ -19,6 +19,7 @@ const NotFound = () => <div className="placeholder-page">404 Not Found</div>;
 const Locations = () => <div className="placeholder-page">Locations Page</div>;
 const Employees = () => <div className="placeholder-page">Employees Page</div>;
 const Reports = () => <div className="placeholder-page">Reports Page</div>;
+const Divisions = () => <div className="placeholder-page">Divisions Page</div>;
 
 const App: React.FC = () => {
   return (
@@ -38,6 +39,8 @@ const App: React.FC = () => {
           <Route path="locations" element={<Locations />} />
           <Route path="employees" element={<Employees />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="divisions" element={<Divisions />} />
+          <Route path="departments" element={<Navigate to="/divisions" replace />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
