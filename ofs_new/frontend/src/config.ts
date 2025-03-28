@@ -1,18 +1,21 @@
-// Конфигурация API и других глобальных настроек приложения
+/**
+ * Конфигурационные параметры приложения
+ */
 
-// Базовый URL API бэкенда
-export const API_URL = 'http://localhost:8000/api/v1';
+// API URL для работы с бэкендом
+export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
-// Настройки пагинации по умолчанию
+// Настройки загрузки файлов
+export const UPLOAD_MAX_SIZE = 5 * 1024 * 1024; // 5MB
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
+export const ALLOWED_DOCUMENT_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+// Параметры пагинации по умолчанию
 export const DEFAULT_PAGE_SIZE = 10;
 export const DEFAULT_PAGE = 1;
 
-// Настройки загрузки файлов
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-export const ALLOWED_FILE_TYPES = {
-  images: ['image/jpeg', 'image/png', 'image/gif'],
-  documents: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-};
+// Интервал автоматического обновления данных (в миллисекундах)
+export const AUTO_REFRESH_INTERVAL = 60000; // 1 минута
 
 // Текст ошибок
 export const ERROR_MESSAGES = {
