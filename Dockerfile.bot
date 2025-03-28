@@ -1,0 +1,16 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Установка зависимостей
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копирование кода
+COPY . .
+
+# Создание директории для загрузок
+RUN mkdir -p uploads/photos
+
+# Запуск бота
+CMD ["python", "telegram_bot/bot.py"] 

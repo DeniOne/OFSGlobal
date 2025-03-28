@@ -1,0 +1,111 @@
+import os
+import shutil
+import logging
+import re
+from pathlib import Path
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('file_repair.log'),
+        logging.StreamHandler()
+    ]
+)
+
+def clean_content(text):
+    """Очищает текст от непечатаемых символов и нормализует переносы строк."""
+    # Удаляем BOM-маркер, если есть
+    if text.startswith('\ufeff'):
+        text = text[1:]
+    
+    # Заменяем непечатаемые символы на пробелы
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', ' ', text)
+    
+    # Нормализуем переносы строк
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    
+    return text
+
+def is_binary_file(file_path):
+    """Проверяет, является ли файл бинарным."""
+    try:
+        with open(file_path, 'rb') as f:
+            chunk = f.read(1024)
+            return b'\0' in chunk or any(x < 9 for x in chunk) or any(x > 126 for x in chunk)
+    except Exception as e:
+        logging.error(f"Ошибка при проверке файла {file_path}: {e}")
+        return False
+
+def clean_file(file_path):
+    """Очищает файл от null-байтов и восстанавливает текст"""
+    try:
+        # Создаем бэкап
+        backup_path = f"{file_path}.bak"
+        shutil.copy2(file_path, backup_path)
+        print(f"Создан бэкап: {backup_path}")
+        
+        # Читаем бинарное содержимое
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        
+        # Список кодировок для попытки декодирования
+        encodings = ['utf-8-sig', 'utf-8', 'cp1251', 'latin1', 'ascii']
+        text = None
+        
+        # Пробуем разные кодировки
+        for encoding in encodings:
+            try:
+                text = content.decode(encoding)
+                print(f"Успешно декодировано с кодировкой {encoding}")
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if text is None:
+            # Если все кодировки не сработали, используем ignore
+            text = content.decode('utf-8', errors='ignore')
+            print("Использован режим ignore для декодирования")
+        
+        # Очищаем текст
+        text = clean_content(text)
+        
+        # Записываем очищенный текст
+        with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+            
+        print(f"Файл очищен: {file_path}")
+        return True
+    except Exception as e:
+        print(f"Ошибка при очистке {file_path}: {str(e)}")
+        return False
+
+def process_directory(directory):
+    """Обрабатывает директорию рекурсивно."""
+    try:
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                file_path = Path(root) / file
+                
+                # Пропускаем бэкапы и временные файлы
+                if file.endswith('.bak') or file.startswith('~$'):
+                    continue
+                
+                # Проверяем только текстовые файлы
+                if file.endswith(('.py', '.html', '.md', '.txt', '.json', '.yaml', '.yml', '.env')):
+                    if is_binary_file(file_path):
+                        logging.info(f"Найден бинарный файл: {file_path}")
+                        clean_file(file_path)
+    except Exception as e:
+        logging.error(f"Ошибка при обработке директории {directory}: {e}")
+
+def main():
+    """Основная функция."""
+    project_dir = Path('.')
+    logging.info("Начинаем обработку файлов проекта")
+    process_directory(project_dir)
+    logging.info("Обработка завершена")
+
+if __name__ == "__main__":
+    main() 

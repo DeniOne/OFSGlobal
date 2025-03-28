@@ -1,0 +1,15 @@
+{
+  "name": "ofs-global",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "cd ofs_new/frontend && npm run dev",
+    "frontend:build": "cd ofs_new/frontend && npm run build",
+    "backend:dev": "cd ofs_new/backend && python run.py",
+    "backend:migrate": "cd ofs_new/backend && alembic upgrade head",
+    "start": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 

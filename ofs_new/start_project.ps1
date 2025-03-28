@@ -71,6 +71,12 @@ function Start-OFSProject {
     
     # Запускаем фронтенд в отдельном процессе
     Write-Host "Запуск фронтенд-сервера из $frontendPath..." -ForegroundColor Cyan
+    $frontendProcess = Start-Process -FilePath "powershell" -ArgumentList "-Command ""cd '$frontendPath'; npm run build""" -PassThru -WindowStyle Normal
+    
+    # Ждем, пока фронтенд полностью перекомпилируется
+    Start-Sleep -Seconds 10
+    
+    # Запускаем фронтенд в отдельном процессе
     $frontendProcess = Start-Process -FilePath "powershell" -ArgumentList "-Command ""cd '$frontendPath'; npm run dev""" -PassThru -WindowStyle Normal
     
     Write-Host "Проект OFS Global запущен!" -ForegroundColor Green

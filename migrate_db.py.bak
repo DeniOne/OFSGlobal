@@ -1,0 +1,12 @@
+from database import recreate_database
+from models import models
+
+# Импортируем все модели перед пересозданием базы
+print("Импортирование моделей...")
+print("Модели загружены:", [cls.__name__ for cls in models.Base.__subclasses__()])
+
+print("Начинаем пересоздание базы данных...")
+recreate_database()
+print("База данных успешно обновлена!")
+
+print("ВАЖНО: Все предыдущие данные были удалены. База данных приведена к новой структуре.") 
