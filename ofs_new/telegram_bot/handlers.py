@@ -1,13 +1,13 @@
 import re
 import logging
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command, StateFilter
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 # Заменяем относительные импорты на абсолютные
-import database
+from database import BotDatabase
 import keyboards
 from config import Config
 
@@ -38,7 +38,7 @@ async def cmd_start(message: Message, state: FSMContext):
     """Обработка команды /start"""
     await state.clear()
     await message.answer(
-        f"👋 Привет, {message.from_user.first_name}! Я бот для регистрации сотрудников компании ФОТОМАТРИЦА.\n"
+        f"👋 Привет, {message.from_user.first_name}! Я бот для регистрации сотрудников компании OFS Global.\n"
         "Используй меню для навигации.",
         reply_markup=keyboards.get_main_keyboard()
     )
@@ -194,8 +194,9 @@ async def process_competencies(callback: CallbackQuery, state: FSMContext):
         
         # Отправляем фото с данными для подтверждения
         if callback.message and callback.message.bot:
+            bot = callback.message.bot
             # Сначала отправляем фото
-            await callback.message.bot.send_photo(
+            await bot.send_photo(
                 chat_id=callback.from_user.id,
                 photo=user_data.get('photo_id'),
                 caption="Твоя фотография для профиля"
@@ -212,6 +213,9 @@ async def process_competencies(callback: CallbackQuery, state: FSMContext):
                 confirmation_text,
                 reply_markup=keyboards.get_confirm_keyboard()
             )
+            
+        # Подтверждаем обработку callback
+        await callback.answer()
     elif callback.data == "clear_competencies":
         # Очистка выбранных компетенций
         await state.update_data(competencies=[])
@@ -219,6 +223,7 @@ async def process_competencies(callback: CallbackQuery, state: FSMContext):
             "Выбери свои компетенции:",
             reply_markup=keyboards.get_competencies_keyboard()
         )
+        await callback.answer("🗑 Компетенции очищены")
     else:
         # Добавление компетенции в список
         user_data = await state.get_data()
@@ -245,40 +250,74 @@ async def process_competencies(callback: CallbackQuery, state: FSMContext):
 
 # Обработчик подтверждения данных
 @router.callback_query(StateFilter(RegistrationStates.waiting_for_confirmation))
-async def confirm_data(callback: CallbackQuery, state: FSMContext):
+async def confirm_data(callback: CallbackQuery, state: FSMContext, confirm_callback):
     """Обработка подтверждения данных сотрудника"""
     if callback.data == "confirm":
-        # Сохранение данных в базу
+        # Получаем данные сотрудника
         user_data = await state.get_data()
-        db = database.Database()
         
-        employee_id = db.add_employee(
-            name=user_data.get("name"),
-            position=user_data.get("position"),
-            email=user_data.get("email"),
-            phone=user_data.get("phone"),
-            telegram_id=user_data.get("telegram_id"),
-            photo_id=user_data.get("photo_id"),
-            competencies=user_data.get("competencies", [])
-        )
+        # Подтверждаем обработку callback
+        await callback.answer("⏳ Обрабатываем данные...")
         
+        # Отправляем данные в основную систему
+        success = await confirm_callback(callback.from_user.id, state)
+        
+        if success:
+            await callback.message.edit_text(
+                "✅ Регистрация успешно завершена! Твои данные отправлены в основную систему."
+            )
+            
+            # Сбрасываем состояние
+            await state.clear()
+            
+            # Отправляем сообщение с клавиатурой
+            await callback.message.answer(
+                "Что хочешь сделать дальше?",
+                reply_markup=keyboards.get_main_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                "❌ При отправке данных произошла ошибка. Пожалуйста, попробуй еще раз или обратись к администратору.",
+                reply_markup=keyboards.get_confirm_keyboard()
+            )
+    else:  # cancel
+        # Отменяем подтверждение
+        await callback.answer("❌ Отменено")
+        await callback.message.edit_text("Регистрация отменена. Ты можешь начать заново.")
+        
+        # Сбрасываем состояние
         await state.clear()
-        await callback.message.edit_text(
-            f"✅ Твои данные успешно сохранены!\n"
-            f"ID сотрудника: {employee_id}"
-        )
+        
+        # Отправляем сообщение с клавиатурой
         await callback.message.answer(
-            "Выбери дальнейшее действие:",
+            "Что хочешь сделать дальше?",
             reply_markup=keyboards.get_main_keyboard()
         )
-    elif callback.data == "cancel":
-        # Отмена подтверждения и возврат в главное меню
-        await state.clear()
-        await callback.message.edit_text("❌ Регистрация отменена.")
-        await callback.message.answer(
-            "Выбери действие:",
-            reply_markup=keyboards.get_main_keyboard()
-        )
+
+def register_handlers(dp: Router, confirm_callback):
+    """Регистрирует обработчики в диспетчере"""
+    # Создаем замыкание, чтобы передать confirm_callback в функцию
+    async def confirm_data_wrapper(callback: CallbackQuery, state: FSMContext):
+        return await confirm_data(callback, state, confirm_callback)
+    
+    # Регистрируем обработчик с нашим врапером
+    router.callback_query.register(
+        confirm_data_wrapper,
+        StateFilter(RegistrationStates.waiting_for_confirmation)
+    )
+    
+    # Отменяем регистрацию исходного обработчика
+    # чтобы избежать конфликтов
+    handlers_to_remove = []
+    for handler in router.callback_query.handlers:
+        if getattr(handler.callback, "__name__", "") == "confirm_data":
+            handlers_to_remove.append(handler)
+    
+    for handler in handlers_to_remove:
+        router.callback_query.handlers.remove(handler)
+    
+    # Включаем роутер в диспетчер
+    dp.include_router(router)
 
 # Обработчик кнопки "Помощь"
 @router.message(F.text == "❓ Помощь")

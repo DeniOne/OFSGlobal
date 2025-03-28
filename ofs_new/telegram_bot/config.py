@@ -24,16 +24,43 @@ class Config:
             logger.error("Не задан токен бота (BOT_TOKEN) в .env файле!")
             raise ValueError("Отсутствует обязательный параметр BOT_TOKEN")
         
-        # ID администраторов
+        # ID администраторов из переменных окружения
         admin_ids = os.getenv("ADMIN_IDS", "")
-        self.ADMIN_IDS = [int(admin_id.strip()) for admin_id in admin_ids.split(",") if admin_id.strip()]
+        
+        # Поддержка как числовых ID, так и юзернеймов с @
+        self.ADMIN_IDS = []
+        for admin_id in admin_ids.split(","):
+            if admin_id.strip():
+                # Если начинается с @, сохраняем как строку (юзернейм)
+                if admin_id.strip().startswith('@'):
+                    self.ADMIN_IDS.append(admin_id.strip())
+                # Иначе пробуем преобразовать в число (ID)
+                else:
+                    try:
+                        self.ADMIN_IDS.append(int(admin_id.strip()))
+                    except ValueError:
+                        # Если не получается, сохраняем как строку
+                        self.ADMIN_IDS.append(admin_id.strip())
+        
+        # Логирование загруженных админов
+        logger.info(f"Загружены администраторы: {self.ADMIN_IDS}")
         
         # Путь к хранилищу данных
         self.STORAGE_PATH = os.getenv("STORAGE_PATH", "./data")
         
         # Настройки логирования
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-        self.LOG_FILE = os.path.join(self.STORAGE_PATH, "logs", "bot.log")
+        self.LOG_FILE = os.getenv("LOG_FILE", "bot.log")
+        
+        # Настройки Redis для хранения состояний
+        self.USE_REDIS = os.getenv("USE_REDIS", "False").lower() == "true"
+        self.REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        
+        # URL API основной системы
+        self.API_URL = os.getenv("API_URL", "http://localhost:8000/api/v1")
+        self.API_WEBHOOK_ENDPOINT = f"{self.API_URL}/telegram-bot/webhook"
+        self.API_TOKEN_VALIDATION_ENDPOINT = f"{self.API_URL}/telegram-bot/validate-token"
+        self.API_ORGANIZATIONS_ENDPOINT = f"{self.API_URL}/telegram-bot/organizations"
         
         # Убедимся, что директория для логов существует
         self._ensure_log_directory()
@@ -42,6 +69,12 @@ class Config:
     
     def _ensure_log_directory(self):
         """Создает директорию для логов, если она не существует"""
+        # Если лог-файл не содержит путь директории, считаем что файл создается в корневой директории
+        if os.path.dirname(self.LOG_FILE) == '':
+            logger.info(f"Лог-файл будет создан в текущей директории: {self.LOG_FILE}")
+            return
+            
+        # Иначе создаем нужную директорию
         log_dir = os.path.dirname(self.LOG_FILE)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)

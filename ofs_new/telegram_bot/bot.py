@@ -4,14 +4,13 @@ import asyncio
 import json
 import aiohttp
 from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage # type: ignore
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup # type: ignore
-from aiogram.utils import executor
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram.filters import Command, StateFilter
 from dotenv import load_dotenv
 
-from handlers import register_handlers
 from database import BotDatabase
+from config import Config
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -25,18 +24,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен бота из переменных окружения
-API_TOKEN = os.getenv("BOT_TOKEN")
-if not API_TOKEN:
-    raise ValueError("BOT_TOKEN не найден в переменных окружения")
+# Загрузка конфигурации
+config = Config()
 
-# URL API основной системы
-API_URL = os.getenv("API_URL", "http://localhost:8000/api")
+# Токен бота из конфигурации
+API_TOKEN = config.BOT_TOKEN
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
+dp = Dispatcher(storage=storage)
 
 # Инициализация базы данных
 db = BotDatabase("bot_data.db")
@@ -53,7 +50,7 @@ async def send_data_to_main_system(employee_data: dict) -> bool:
         bool: True если данные успешно отправлены, False в противном случае
     """
     try:
-        endpoint = f"{API_URL}/employees/from_bot"
+        endpoint = config.API_WEBHOOK_ENDPOINT
         
         async with aiohttp.ClientSession() as session:
             async with session.post(endpoint, json=employee_data) as response:
@@ -100,33 +97,29 @@ async def confirm_employee_data_and_send(user_id: int, state: FSMContext):
     
     return success
 
-# Регистрация обработчиков
-def register_all_handlers(dp: Dispatcher):
-    """Регистрирует все обработчики команд и сообщений"""
-    register_handlers(dp, confirm_employee_data_and_send)
-
-async def on_startup(dp: Dispatcher):
-    """Действия при запуске бота"""
+async def main():
+    """Главная функция запуска бота"""
     # Инициализация базы данных при необходимости
     db.init_db()
     
+    # Импортируем зависимые модули здесь, чтобы избежать циклических импортов
+    from handlers import register_handlers
+    
     # Регистрация обработчиков
-    register_all_handlers(dp)
+    register_handlers(dp, confirm_employee_data_and_send)
     
+    # Запуск бота
     logger.info("Бот запущен")
-
-async def on_shutdown(dp: Dispatcher):
-    """Действия при остановке бота"""
-    await dp.storage.close()
-    await dp.storage.wait_closed()
+    logger.info(f"API URL: {config.API_URL}")
     
-    logger.info("Бот остановлен")
+    # Запуск поллинга
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    # Запуск бота
-    executor.start_polling(
-        dp,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        skip_updates=True
-    ) 
+    try:
+        # Запуск бота
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Бот остановлен")
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {str(e)}") 

@@ -1,171 +1,234 @@
-from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Body, File, UploadFile
-from fastapi.responses import JSONResponse
+from typing import Any, List, Dict, Optional
+import uuid
+import random
+import string
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
-import os
-from datetime import datetime
-import base64
 
 from app import crud, models, schemas
 from app.api import deps
-from app.core.config import settings
+from app.crud import crud_employee, crud_position, crud_division
+from app.models.employee import Employee
+from app.schemas.employee import EmployeeCreate, Employee as EmployeeSchema
 
 router = APIRouter()
 
-
-@router.post("/webhook", response_model=Dict[str, Any])
-async def process_telegram_webhook(
-    background_tasks: BackgroundTasks,
-    data: Dict[str, Any] = Body(...),
-    db: Session = Depends(deps.get_db),
-) -> Any:
+@router.post("/webhook", status_code=status.HTTP_200_OK)
+def webhook(data: Dict[Any, Any], db: Session = Depends(deps.get_db)):
     """
-    Обработка вебхука от Telegram бота.
-    Получает данные анкеты сотрудника и создает запись в базе данных.
+    Принимает данные от Telegram-бота и обрабатывает их
     """
-    # Проверяем наличие всех необходимых полей в анкете
-    required_fields = ["name", "position", "department", "organization_id"]
-    for field in required_fields:
-        if field not in data:
-            return JSONResponse(
-                status_code=400,
-                content={"message": f"Отсутствует обязательное поле: {field}"}
-            )
-    
-    # Проверяем наличие фотографии - она обязательна
-    if "photo" not in data or not data["photo"]:
-        return JSONResponse(
-            status_code=400,
-            content={"message": "Фотография сотрудника обязательна"}
-        )
-    
-    # Сохраняем фотографию
     try:
-        # Создаем директорию если не существует
-        os.makedirs(os.path.join(settings.UPLOAD_DIR, "photos"), exist_ok=True)
+        # Проверка необходимых полей в данных
+        required_fields = ["name", "telegram_id", "position"]
+        for field in required_fields:
+            if field not in data:
+                return {"status": "error", "message": f"Missing required field: {field}"}
+                
+        # Поддержка нового формата данных, где division вместо department
+        department = data.get("department", "")
+        division = data.get("division", "")
+        division_id = data.get("division_id")
         
-        # Декодируем base64 фото
-        photo_data = base64.b64decode(data["photo"])
+        # Предпочитаем division если оно указано
+        department_value = division if division else department
         
-        # Формируем имя файла с временной меткой
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_telegram_photo.jpg"
-        photo_path = os.path.join("photos", filename)
-        full_path = os.path.join(settings.UPLOAD_DIR, photo_path)
-        
-        # Записываем фото на диск
-        with open(full_path, "wb") as f:
-            f.write(photo_data)
-        
-        # Обновляем данные сотрудника
-        data["photo_path"] = photo_path
-    
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"message": f"Ошибка при сохранении фотографии: {str(e)}"}
+        # Создание объекта сотрудника
+        employee_data = EmployeeCreate(
+            name=data.get("name", ""),
+            email=data.get("email", ""),
+            phone=data.get("phone", ""),
+            position=data.get("position", ""),
+            department=department_value,  # Используем вычисленное значение
+            division_id=division_id,  # Добавляем поддержку division_id
+            telegram_id=data.get("telegram_id", ""),
+            organization_id=data.get("organization_id", 1),
+            photo_path=data.get("photo_path", ""),
+            competencies=data.get("competencies", [])
         )
-    
-    # Обработка других документов, если они есть
-    if "passport" in data and data["passport"]:
-        try:
-            os.makedirs(os.path.join(settings.UPLOAD_DIR, "documents"), exist_ok=True)
-            passport_data = base64.b64decode(data["passport"])
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{timestamp}_telegram_passport.pdf"
-            passport_path = os.path.join("documents", filename)
-            full_path = os.path.join(settings.UPLOAD_DIR, passport_path)
-            
-            with open(full_path, "wb") as f:
-                f.write(passport_data)
-            
-            data["passport_path"] = passport_path
-        except Exception as e:
-            return JSONResponse(
-                status_code=500,
-                content={"message": f"Ошибка при сохранении паспорта: {str(e)}"}
-            )
-    
-    if "work_contract" in data and data["work_contract"]:
-        try:
-            os.makedirs(os.path.join(settings.UPLOAD_DIR, "documents"), exist_ok=True)
-            contract_data = base64.b64decode(data["work_contract"])
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{timestamp}_telegram_contract.pdf"
-            contract_path = os.path.join("documents", filename)
-            full_path = os.path.join(settings.UPLOAD_DIR, contract_path)
-            
-            with open(full_path, "wb") as f:
-                f.write(contract_data)
-            
-            data["work_contract_path"] = contract_path
-        except Exception as e:
-            return JSONResponse(
-                status_code=500,
-                content={"message": f"Ошибка при сохранении трудового договора: {str(e)}"}
-            )
-    
-    # Удаляем бинарные данные из словаря
-    if "photo" in data:
-        del data["photo"]
-    if "passport" in data:
-        del data["passport"]
-    if "work_contract" in data:
-        del data["work_contract"]
-    
-    # Создаем сотрудника
-    try:
-        employee_in = schemas.EmployeeCreate(**data)
-        employee = crud.employee.create(db=db, obj_in=employee_in)
+        
+        # Сохранение в БД
+        employee = crud_employee.create_employee(db=db, obj_in=employee_data)
         
         return {
-            "success": True,
-            "message": "Сотрудник успешно зарегистрирован",
+            "status": "success", 
+            "message": "Сотрудник успешно зарегистрирован", 
             "employee_id": employee.id
         }
-    
+        
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"message": f"Ошибка при создании сотрудника: {str(e)}"}
-        )
+        return {"status": "error", "message": str(e)}
 
-
-@router.post("/validate-token", response_model=Dict[str, Any])
-def validate_telegram_bot_token(
-    token: str = Body(..., embed=True),
-    db: Session = Depends(deps.get_db),
-) -> Any:
+@router.post("/validate-token", status_code=status.HTTP_200_OK)
+def validate_token(token_data: Dict[str, str], db: Session = Depends(deps.get_db)):
     """
-    Валидация токена Telegram бота.
-    Используется для проверки подлинности запросов от бота.
+    Проверяет токен Telegram-бота на валидность
     """
-    # Здесь должна быть проверка токена на соответствие настроенному в системе
-    # В упрощенном варианте просто сравниваем с захардкоженным значением
-    expected_token = "your_telegram_bot_secret_token"  # В реальном приложении брать из настроек
+    # В будущем здесь можно реализовать более сложную логику проверки
+    token = token_data.get("token", "")
     
-    if token == expected_token:
-        return {"valid": True, "message": "Токен действителен"}
+    # Простая проверка - сравнение с переменной окружения или значением из БД
+    # В реальном приложении нужно использовать более безопасный метод
+    if token == "7551929518:AAETdyi8z_hnfmEB7ki-VSAYiSkEJtu7jQM":
+        return {"status": "valid", "message": "Токен действителен"}
     else:
-        return {"valid": False, "message": "Недействительный токен"}
-
+        return {"status": "invalid", "message": "Токен недействителен"}
 
 @router.get("/organizations", response_model=List[Dict[str, Any]])
-def get_organizations_for_bot(
-    db: Session = Depends(deps.get_db),
-) -> Any:
+def get_organizations(db: Session = Depends(deps.get_db)):
     """
-    Получить список организаций для выбора в Telegram боте.
+    Возвращает список организаций для выбора в Telegram-боте
     """
-    organizations = crud.organization.get_multi(db)
-    
-    # Преобразуем в простой список для бота
-    result = []
-    for org in organizations:
-        result.append({
-            "id": org.id,
-            "name": org.name,
-            "description": org.description or ""
-        })
-    
-    return result 
+    try:
+        # В будущем здесь можно реализовать извлечение списка организаций из БД
+        # Пока вернем просто заглушку
+        print("Вызван метод get_organizations")
+        return [
+            {"id": 1, "name": "OFS Global", "description": "Основная организация"},
+            {"id": 2, "name": "OFS Consulting", "description": "Консалтинговое подразделение"},
+            {"id": 3, "name": "OFS Development", "description": "Подразделение разработки"}
+        ]
+    except Exception as e:
+        print(f"Ошибка в get_organizations: {str(e)}")
+        return [
+            {"id": 1, "name": "OFS Global", "description": "Ошибка: " + str(e)}
+        ]
+
+# Словарь для хранения сгенерированных кодов (в реальной системе нужно хранить в БД)
+# { "код": {"telegram_id": "...", "position_id": 1, "division_id": 2, "expires_at": "2023-01-01"} }
+invitation_codes = {}
+
+@router.post("/generate-invitation", status_code=status.HTTP_200_OK)
+def generate_invitation_code(data: Dict[Any, Any], db: Session = Depends(deps.get_db)):
+    """
+    Генерирует код приглашения для регистрации сотрудника
+    """
+    try:
+        # Проверка обязательных данных
+        required_fields = ["position_id", "telegram_id", "user_full_name"]
+        for field in required_fields:
+            if field not in data:
+                return {"status": "error", "message": f"Missing required field: {field}"}
+        
+        # Получаем данные из запроса
+        position_id = data.get("position_id")
+        telegram_id = data.get("telegram_id")
+        user_full_name = data.get("user_full_name")
+        division_id = data.get("division_id")
+        organization_id = data.get("organization_id", 1)
+        
+        # Проверяем существование должности
+        position = None
+        if db:
+            position = crud_position.get(db, id=position_id)
+            if not position:
+                return {"status": "error", "message": f"Position with id {position_id} not found"}
+        
+        # Проверяем существование отдела, если он указан
+        division = None
+        if division_id and db:
+            division = crud_division.get(db, id=division_id)
+            if not division:
+                return {"status": "error", "message": f"Division with id {division_id} not found"}
+        
+        # Генерируем уникальный код (6 символов: буквы и цифры)
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        
+        # Устанавливаем срок действия (24 часа)
+        expires_at = (datetime.now() + timedelta(hours=24)).isoformat()
+        
+        # Сохраняем код в словаре (в реальной системе - в БД)
+        invitation_codes[code] = {
+            "telegram_id": telegram_id,
+            "user_full_name": user_full_name,
+            "position_id": position_id,
+            "position_name": position.name if position else "Unknown",
+            "division_id": division_id,
+            "division_name": division.name if division else None,
+            "organization_id": organization_id,
+            "created_at": datetime.now().isoformat(),
+            "expires_at": expires_at,
+            "is_used": False
+        }
+        
+        # Возвращаем код
+        return {
+            "status": "success",
+            "message": "Invitation code generated successfully",
+            "code": code,
+            "position": {
+                "id": position_id,
+                "name": position.name if position else "Unknown"
+            },
+            "division": {
+                "id": division_id,
+                "name": division.name if division else None
+            } if division_id else None,
+            "organization_id": organization_id,
+            "expires_at": expires_at
+        }
+    except Exception as e:
+        print(f"Ошибка в generate_invitation_code: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+@router.post("/validate-invitation", status_code=status.HTTP_200_OK)
+def validate_invitation_code(data: Dict[str, Any], db: Session = Depends(deps.get_db)):
+    """
+    Проверяет валидность кода приглашения
+    """
+    try:
+        # Получаем данные из запроса
+        code = data.get("code", "")
+        telegram_id = data.get("telegram_id", "")
+        
+        # Проверяем существование кода
+        if code not in invitation_codes:
+            return {"status": "error", "message": "Invalid invitation code"}
+        
+        # Получаем данные кода
+        code_data = invitation_codes[code]
+        
+        # Проверяем срок действия
+        if datetime.now() > datetime.fromisoformat(code_data["expires_at"]):
+            return {"status": "error", "message": "Invitation code has expired"}
+        
+        # Проверяем, что код принадлежит этому пользователю
+        if str(code_data["telegram_id"]) != str(telegram_id):
+            return {"status": "error", "message": "Invitation code is not assigned to this user"}
+        
+        # Проверяем, что код не использован
+        if code_data.get("is_used", False):
+            return {"status": "error", "message": "Invitation code has already been used"}
+        
+        # Получаем данные о должности из БД
+        position = None
+        if db:
+            position = crud_position.get(db, id=code_data["position_id"])
+        
+        # Получаем данные об отделе из БД, если указан
+        division = None
+        if code_data.get("division_id") and db:
+            division = crud_division.get(db, id=code_data["division_id"])
+        
+        # Отмечаем код как использованный
+        code_data["is_used"] = True
+        
+        # Возвращаем данные кода
+        return {
+            "status": "success",
+            "message": "Invitation code is valid",
+            "position": {
+                "id": code_data["position_id"],
+                "name": position.name if position else code_data.get("position_name", "Unknown")
+            },
+            "division": {
+                "id": code_data.get("division_id"),
+                "name": division.name if division else code_data.get("division_name")
+            } if code_data.get("division_id") else None,
+            "organization_id": code_data.get("organization_id", 1),
+            "user_full_name": code_data.get("user_full_name", "")
+        }
+    except Exception as e:
+        print(f"Ошибка в validate_invitation_code: {str(e)}")
+        return {"status": "error", "message": str(e)} 

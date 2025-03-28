@@ -81,6 +81,41 @@ class CRUDEmployee(CRUDBase[Employee, EmployeeCreate, EmployeeUpdate]):
         Получить сотрудника по email
         """
         return db.query(self.model).filter(Employee.email == email).first()
+        
+    def get_by_telegram_id(self, db: Session, *, telegram_id: str) -> Optional[Employee]:
+        """
+        Получить сотрудника по идентификатору Telegram
+        """
+        return db.query(self.model).filter(Employee.telegram_id == telegram_id).first()
+        
+    def create_employee(self, db: Session, *, obj_in: EmployeeCreate) -> Employee:
+        """
+        Создать сотрудника из Telegram-бота
+        
+        Если сотрудник с таким telegram_id уже существует, его данные обновляются.
+        В противном случае создается новый сотрудник.
+        """
+        # Проверяем, существует ли сотрудник с таким telegram_id
+        existing_employee = self.get_by_telegram_id(db, telegram_id=obj_in.telegram_id)
+        
+        if existing_employee:
+            # Обновляем существующего сотрудника
+            update_data = obj_in.dict(exclude_unset=True)
+            for field, value in update_data.items():
+                setattr(existing_employee, field, value)
+            
+            db.add(existing_employee)
+            db.commit()
+            db.refresh(existing_employee)
+            return existing_employee
+        else:
+            # Создаем нового сотрудника
+            obj_in_data = jsonable_encoder(obj_in)
+            db_obj = self.model(**obj_in_data)
+            db.add(db_obj)
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
 
 
 employee = CRUDEmployee(Employee) 

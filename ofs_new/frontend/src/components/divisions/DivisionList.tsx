@@ -26,8 +26,10 @@ import {
   Card,
   CardContent,
   Divider,
-  TreeView,
-  TreeItem
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -218,52 +220,51 @@ const DivisionList: React.FC = () => {
   // Генерация элементов дерева
   const renderTree = (nodes: Division[]) => {
     return nodes.map((node) => (
-      <TreeItem 
-        key={node.id} 
-        nodeId={String(node.id)} 
-        label={
-          <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, pr: 0 }}>
-            <Typography variant="body2" sx={{ fontWeight: 'inherit', flexGrow: 1 }}>
-              {node.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {node.code && `(${node.code})`}
-            </Typography>
-            {!node.is_active && (
-              <Chip 
-                label="Неактивный" 
-                size="small" 
-                color="default" 
-                variant="outlined" 
-                sx={{ ml: 1 }}
-              />
-            )}
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedDivision(node);
-                setOpenEdit(true);
-              }}
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteDivision(node.id);
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        }
+      <ListItem 
+        key={node.id}
+        sx={{ pl: node.parent_id ? 4 : 1, borderLeft: node.parent_id ? '1px dashed #ccc' : 'none' }}
       >
-        {Array.isArray(node.children) && node.children.length > 0
-          ? renderTree(node.children)
-          : null}
-      </TreeItem>
+        <ListItemIcon>
+          {node.children && node.children.length > 0 ? <ExpandMore /> : <ChevronRight />}
+        </ListItemIcon>
+        <ListItemText
+          primary={
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'inherit', flexGrow: 1 }}>
+                {node.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {node.code && `(${node.code})`}
+              </Typography>
+              {!node.is_active && (
+                <Chip 
+                  label="Неактивный" 
+                  size="small" 
+                  color="default" 
+                  variant="outlined" 
+                  sx={{ ml: 1 }}
+                />
+              )}
+            </Box>
+          }
+        />
+        <IconButton
+          size="small"
+          onClick={() => {
+            setSelectedDivision(node);
+            setOpenEdit(true);
+          }}
+        >
+          <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={() => handleDeleteDivision(node.id)}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+        {node.children && node.children.length > 0 && renderTree(node.children)}
+      </ListItem>
     ));
   };
   
@@ -397,27 +398,35 @@ const DivisionList: React.FC = () => {
         </Paper>
       </Collapse>
       
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <CircularProgress />
-        </Box>
-      ) : showTree ? (
-        // Древовидное представление
-        <Paper sx={{ p: 2 }}>
-          <TreeView
-            defaultCollapseIcon={<ExpandMore />}
-            defaultExpandIcon={<ChevronRight />}
-            sx={{ flexGrow: 1, maxHeight: 600, overflow: 'auto' }}
-          >
-            {treeData.length > 0 ? (
-              renderTree(treeData)
+      {/* Табличное или древовидное представление */}
+      {showTree ? (
+        <Card sx={{ mt: 2 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6">Структура отделов</Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RefreshIcon />}
+                onClick={() => fetchDivisionTree()}
+              >
+                Обновить
+              </Button>
+            </Box>
+            
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : treeData.length > 0 ? (
+              <List>
+                {renderTree(treeData)}
+              </List>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                Нет данных для отображения
-              </Typography>
+              <Alert severity="info">Нет данных для отображения</Alert>
             )}
-          </TreeView>
-        </Paper>
+          </CardContent>
+        </Card>
       ) : (
         // Табличное представление
         <TableContainer component={Paper}>

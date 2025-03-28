@@ -2,8 +2,18 @@
  * Конфигурационные параметры приложения
  */
 
+// Расширяем тип ImportMeta для TypeScript
+interface ImportMetaEnv {
+  VITE_API_URL?: string;
+  // Добавьте здесь другие переменные окружения при необходимости
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 // API URL для работы с бэкендом
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+export const API_URL = process.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 // Настройки загрузки файлов
 export const UPLOAD_MAX_SIZE = 5 * 1024 * 1024; // 5MB
