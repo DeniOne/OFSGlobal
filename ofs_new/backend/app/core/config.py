@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
+    POSTGRES_PASSWORD: str = "QAZwsxr$t5"
     POSTGRES_DB: str = "ofs_db"
     SQLALCHEMY_DATABASE_URI: Optional[str] = None
 
@@ -52,8 +52,8 @@ class Settings(BaseSettings):
         host = values.get("POSTGRES_SERVER", "localhost")
         db = values.get("POSTGRES_DB", "")
         
-        # Собираем URL для асинхронного подключения
-        return f"postgresql+asyncpg://{user}:{password}@{host}/{db}"
+        # Собираем URL для асинхронного подключения с явным указанием кодировки UTF-8
+        return f"postgresql+asyncpg://{user}:{password}@{host}/{db}?client_encoding=utf8"
 
     @property
     def SYNC_SQLALCHEMY_DATABASE_URI(self) -> str:
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         password = quote_plus(self.POSTGRES_PASSWORD)
         host = self.POSTGRES_SERVER
         db = self.POSTGRES_DB
-        return f"postgresql://{user}:{password}@{host}/{db}"
+        return f"postgresql://{user}:{password}@{host}/{db}?client_encoding=utf8"
 
     SMTP_TLS: bool = True
     SMTP_PORT: Optional[int] = None
@@ -100,6 +100,10 @@ class Settings(BaseSettings):
 
     # SQLAlchemy settings
     SQLALCHEMY_ECHO: bool = False  # Enable SQL query logging for debugging
+    
+    # Database encoding settings
+    DB_CHARSET: str = "utf8"
+    DB_COLLATION: str = "utf8_general_ci"
 
     class Config:
         case_sensitive = True
