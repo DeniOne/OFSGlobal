@@ -75,7 +75,7 @@ const LandingPage: React.FC = () => {
               <div className="section-icon">👥</div>
               <h3>Сотрудники</h3>
               <p>Управление персоналом компании</p>
-              <Link to="/employees" className="section-button">Перейти</Link>
+              <Link to="/staff" className="section-button">Перейти</Link>
             </div>
             <div className="section-card">
               <div className="section-icon">📊</div>

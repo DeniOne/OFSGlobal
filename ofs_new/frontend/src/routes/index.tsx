@@ -50,7 +50,7 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
-        path="/employees"
+        path="/staff"
         element={
           <ProtectedRoute>
             <EmployeesPage />
@@ -58,7 +58,7 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
-        path="/employees/new"
+        path="/staff/new"
         element={
           <ProtectedRoute>
             <EmployeeFormPage />
@@ -66,7 +66,7 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
-        path="/employees/:id/edit"
+        path="/staff/:id/edit"
         element={
           <ProtectedRoute>
             <EmployeeFormPage />
@@ -98,7 +98,7 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
-        path="/departments"
+        path="/divisions"
         element={
           <ProtectedRoute>
             <DepartmentsPage />

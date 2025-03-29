@@ -123,7 +123,7 @@ const DepartmentList: React.FC = () => {
     
     try {
       setLoading(true);
-      let url = `/departments/?organization_id=${selectedOrg}&include_inactive=${includeInactive}`;
+      let url = `/divisions/?organization_id=${selectedOrg}&include_inactive=${includeInactive}`;
       
       if (parentDepartment !== null) {
         url += `&parent_id=${parentDepartment}`;
@@ -144,7 +144,7 @@ const DepartmentList: React.FC = () => {
     
     try {
       setLoading(true);
-      const response = await api.get(`/departments/tree/${selectedOrg}?include_inactive=${includeInactive}`);
+      const response = await api.get(`/divisions/tree/${selectedOrg}?include_inactive=${includeInactive}`);
       setDepartmentTree(response.data);
       setLoading(false);
     } catch (err) {
@@ -171,7 +171,7 @@ const DepartmentList: React.FC = () => {
       }
       
       setLoading(true);
-      let url = '/departments/';
+      let url = '/divisions/';
       let params = {};
       
       if (formData.parent_id) {
@@ -198,7 +198,7 @@ const DepartmentList: React.FC = () => {
     
     try {
       setLoading(true);
-      await api.put(`/departments/${editId}`, formData);
+      await api.put(`/divisions/${editId}`, formData);
       setOpenEdit(false);
       resetForm();
       fetchDepartments();
@@ -216,7 +216,7 @@ const DepartmentList: React.FC = () => {
   const handleDeleteDepartment = async (id: number) => {
     try {
       setLoading(true);
-      await api.delete(`/departments/${id}`);
+      await api.delete(`/divisions/${id}`);
       fetchDepartments();
       if (showTree) {
         fetchDepartmentTree();

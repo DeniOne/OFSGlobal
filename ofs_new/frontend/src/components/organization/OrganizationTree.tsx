@@ -127,7 +127,7 @@ const OrganizationTree: React.FC = () => {
   const fetchEmployees = async (organizationId: number) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/employees/?organization_id=${organizationId}`);
+      const response = await fetch(`${API_URL}/staff/?organization_id=${organizationId}`);
       if (response.ok) {
         const data = await response.json();
         setEmployees(data);

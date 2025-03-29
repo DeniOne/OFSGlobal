@@ -102,7 +102,7 @@ const EmployeeForm: React.FC = () => {
     setLoading(true);
     
     try {
-      const response = await fetch(`${API_URL}/employees/${id}`);
+      const response = await fetch(`${API_URL}/staff/${id}`);
       if (!response.ok) throw new Error('Не удалось загрузить данные сотрудника');
       
       const data = await response.json();
@@ -141,7 +141,7 @@ const EmployeeForm: React.FC = () => {
     if (!orgId) return;
     
     try {
-      const response = await fetch(`${API_URL}/employees/?organization_id=${orgId}`);
+      const response = await fetch(`${API_URL}/staff/?organization_id=${orgId}`);
       if (!response.ok) throw new Error('Не удалось загрузить список сотрудников');
       
       const data = await response.json();
@@ -334,8 +334,8 @@ const EmployeeForm: React.FC = () => {
         if (contractFile) formDataObj.append('work_contract', contractFile);
         
         const url = isEditing 
-          ? `${API_URL}/employees/${id}` 
-          : `${API_URL}/employees/with-files`;
+          ? `${API_URL}/staff/${id}` 
+          : `${API_URL}/staff/with-files`;
         
         const method = isEditing ? 'PUT' : 'POST';
         
@@ -353,13 +353,13 @@ const EmployeeForm: React.FC = () => {
         
         // Перенаправляем на страницу со списком сотрудников
         setTimeout(() => {
-          navigate('/employees');
+          navigate('/staff');
         }, 2000);
       } else {
         // Если нет файлов, отправляем JSON
         const url = isEditing 
-          ? `${API_URL}/employees/${id}` 
-          : `${API_URL}/employees/`;
+          ? `${API_URL}/staff/${id}` 
+          : `${API_URL}/staff/`;
         
         const method = isEditing ? 'PUT' : 'POST';
         
@@ -380,7 +380,7 @@ const EmployeeForm: React.FC = () => {
         
         // Перенаправляем на страницу со списком сотрудников
         setTimeout(() => {
-          navigate('/employees');
+          navigate('/staff');
         }, 2000);
       }
     } catch (err: any) {
@@ -392,7 +392,7 @@ const EmployeeForm: React.FC = () => {
   };
   
   const handleCancel = () => {
-    navigate('/employees');
+    navigate('/staff');
   };
   
   if (loading) {

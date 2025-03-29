@@ -101,7 +101,7 @@ const FunctionalRelationsManager: React.FC<FunctionalRelationsManagerProps> = ({
         data.map(async (relation: FunctionalRelation) => {
           // Загружаем данные руководителя, если мы не на странице руководителя
           if (!isManager) {
-            const managerResponse = await fetch(`${API_URL}/employees/${relation.manager_id}`);
+            const managerResponse = await fetch(`${API_URL}/staff/${relation.manager_id}`);
             if (managerResponse.ok) {
               const managerData = await managerResponse.json();
               relation.manager = {
@@ -114,7 +114,7 @@ const FunctionalRelationsManager: React.FC<FunctionalRelationsManagerProps> = ({
           
           // Загружаем данные подчиненного, если мы не на странице подчиненного
           if (isManager) {
-            const subordinateResponse = await fetch(`${API_URL}/employees/${relation.subordinate_id}`);
+            const subordinateResponse = await fetch(`${API_URL}/staff/${relation.subordinate_id}`);
             if (subordinateResponse.ok) {
               const subordinateData = await subordinateResponse.json();
               relation.subordinate = {
@@ -142,7 +142,7 @@ const FunctionalRelationsManager: React.FC<FunctionalRelationsManagerProps> = ({
   const fetchAvailableEmployees = async () => {
     try {
       // Загружаем список всех сотрудников
-      const response = await fetch(`${API_URL}/employees/`);
+      const response = await fetch(`${API_URL}/staff/`);
       
       if (!response.ok) {
         throw new Error('Не удалось загрузить список сотрудников');

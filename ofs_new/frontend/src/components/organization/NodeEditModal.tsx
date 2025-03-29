@@ -113,7 +113,7 @@ const NodeEditModal: React.FC<NodeEditModalProps> = ({ open, node, onClose, onSa
   // Загрузка списка отделов
   const fetchDepartments = async () => {
     try {
-      const response = await fetch(`${API_URL}/departments/`);
+      const response = await fetch(`${API_URL}/divisions/`);
       if (response.ok) {
         const data = await response.json();
         setDepartments(data);
@@ -127,7 +127,7 @@ const NodeEditModal: React.FC<NodeEditModalProps> = ({ open, node, onClose, onSa
   const fetchEmployeeDetails = async (employeeId: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/employees/${employeeId}`);
+      const response = await fetch(`${API_URL}/staff/${employeeId}`);
       if (response.ok) {
         const data = await response.json();
         
@@ -155,7 +155,7 @@ const NodeEditModal: React.FC<NodeEditModalProps> = ({ open, node, onClose, onSa
   // Загрузка списка потенциальных руководителей
   const fetchManagers = async (orgId: number, employeeId: string) => {
     try {
-      const response = await fetch(`${API_URL}/employees/?organization_id=${orgId}`);
+      const response = await fetch(`${API_URL}/staff/?organization_id=${orgId}`);
       if (response.ok) {
         const data = await response.json();
         
@@ -260,7 +260,7 @@ const NodeEditModal: React.FC<NodeEditModalProps> = ({ open, node, onClose, onSa
         is_active: isActive
       };
       
-      const response = await fetch(`${API_URL}/employees/${employeeId}`, {
+      const response = await fetch(`${API_URL}/staff/${employeeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

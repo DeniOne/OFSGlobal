@@ -53,7 +53,7 @@ const menuItems = [
   {
     text: "Отделы",
     icon: <DomainAddIcon />,
-    path: "/departments",
+    path: "/divisions",
   },
   {
     text: "Должности",
@@ -63,7 +63,7 @@ const menuItems = [
   {
     text: "Сотрудники",
     icon: <PeopleIcon />,
-    path: "/employees",
+    path: "/staff",
   },
   {
     text: "Функциональные связи",

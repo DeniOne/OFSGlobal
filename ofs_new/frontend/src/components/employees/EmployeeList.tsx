@@ -83,7 +83,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ organizationId }) => {
     setLoading(true);
     
     try {
-      let url = `${API_URL}/employees/?skip=${(page-1) * limit}&limit=${limit}`;
+      let url = `${API_URL}/staff/?skip=${(page-1) * limit}&limit=${limit}`;
       
       // Добавляем фильтры
       if (selectedOrg) url += `&organization_id=${selectedOrg}`;
@@ -125,7 +125,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ organizationId }) => {
     if (!confirm('Вы уверены, что хотите удалить этого сотрудника?')) return;
     
     try {
-      const response = await fetch(`${API_URL}/employees/${id}`, {
+      const response = await fetch(`${API_URL}/staff/${id}`, {
         method: 'DELETE',
       });
       
@@ -150,7 +150,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ organizationId }) => {
           color="primary" 
           startIcon={<AddCircle />}
           component={Link}
-          to="/employees/new"
+          to="/staff/new"
         >
           Добавить сотрудника
         </Button>
@@ -273,7 +273,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ organizationId }) => {
                           <Tooltip title="Просмотр">
                             <IconButton 
                               component={Link} 
-                              to={`/employees/${employee.id}`}
+                              to={`/staff/${employee.id}`}
                               color="primary"
                             >
                               <Visibility />
@@ -282,7 +282,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ organizationId }) => {
                           <Tooltip title="Редактировать">
                             <IconButton 
                               component={Link} 
-                              to={`/employees/${employee.id}/edit`}
+                              to={`/staff/${employee.id}/edit`}
                               color="secondary"
                             >
                               <Edit />
