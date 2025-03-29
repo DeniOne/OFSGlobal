@@ -24,9 +24,8 @@ import {
   CircularProgress,
   Alert,
   Collapse,
-  TreeView,
-  TreeItem
 } from '@mui/material';
+import { TreeView, TreeItem } from '@mui/x-tree-view';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -44,7 +43,7 @@ interface Organization {
   name: string;
 }
 
-interface Department {
+interface Division {
   id: number;
   name: string;
   code: string | null;
@@ -55,7 +54,7 @@ interface Department {
   parent_id: number | null;
 }
 
-interface DepartmentTree extends Department {
+interface DepartmentTree extends Division {
   children: DepartmentTree[];
 }
 
@@ -69,7 +68,7 @@ interface FormData {
 }
 
 const DepartmentList: React.FC = () => {
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDepartments] = useState<Division[]>([]);
   const [departmentTree, setDepartmentTree] = useState<DepartmentTree[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<number | ''>('');
@@ -229,16 +228,16 @@ const DepartmentList: React.FC = () => {
     }
   };
 
-  const handleEditClick = (department: Department) => {
+  const handleEditClick = (division: Division) => {
     setFormData({
-      name: department.name,
-      code: department.code || '',
-      description: department.description || '',
-      is_active: department.is_active,
-      organization_id: department.organization_id,
-      parent_id: department.parent_id
+      name: division.name,
+      code: division.code || '',
+      description: division.description || '',
+      is_active: division.is_active,
+      organization_id: division.organization_id,
+      parent_id: division.parent_id
     });
-    setEditId(department.id);
+    setEditId(division.id);
     setOpenEdit(true);
   };
 
@@ -372,7 +371,7 @@ const DepartmentList: React.FC = () => {
                 onChange={(e) => setParentDepartment(e.target.value === '' ? null : Number(e.target.value))}
               >
                 <MenuItem value="">Корневые отделы</MenuItem>
-                {departments.map(dept => (
+                {divisions.map(dept => (
                   <MenuItem key={dept.id} value={dept.id}>{dept.name}</MenuItem>
                 ))}
               </Select>
@@ -430,8 +429,8 @@ const DepartmentList: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {departments.length > 0 ? (
-                    departments.map((dept) => (
+                  {divisions.length > 0 ? (
+                    divisions.map((dept) => (
                       <TableRow key={dept.id}>
                         <TableCell>{dept.name}</TableCell>
                         <TableCell>{dept.code || '-'}</TableCell>
@@ -514,7 +513,7 @@ const DepartmentList: React.FC = () => {
                 }}
               >
                 <MenuItem value="">Корневой уровень</MenuItem>
-                {departments.map(dept => (
+                {divisions.map(dept => (
                   <MenuItem key={dept.id} value={dept.id}>{dept.name}</MenuItem>
                 ))}
               </Select>

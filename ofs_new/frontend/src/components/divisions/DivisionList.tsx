@@ -29,8 +29,13 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
+import { TreeView, TreeItem } from '@mui/x-tree-view';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -45,6 +50,8 @@ import {
 import { Division, Organization } from '../../types/organization';
 import DivisionEditModal from './DivisionEditModal';
 import { API_URL } from '../../config';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../../services/api';
 
 const DivisionList: React.FC = () => {
   // Состояния данных
@@ -64,6 +71,18 @@ const DivisionList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [parentDivision, setParentDivision] = useState<number | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [formData, setFormData] = useState<Division>({
+    id: 0,
+    name: '',
+    code: '',
+    description: '',
+    is_active: true,
+    level: 0,
+    organization_id: 0,
+    parent_id: null
+  });
+  const [editId, setEditId] = useState<number | null>(null);
+  const navigate = useNavigate();
   
   // Первоначальная загрузка данных
   useEffect(() => {
@@ -87,17 +106,12 @@ const DivisionList: React.FC = () => {
   const fetchOrganizations = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/organizations/`);
-      if (!response.ok) {
-        throw new Error('Ошибка при загрузке организаций');
-      }
-      
-      const data = await response.json();
-      setOrganizations(data);
+      const response = await api.get('/organizations/');
+      setOrganizations(response.data);
       
       // Если есть организации, выбираем первую по умолчанию
-      if (data.length > 0) {
-        setSelectedOrg(data[0].id);
+      if (response.data.length > 0) {
+        setSelectedOrg(response.data[0].id);
       }
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке организаций');
@@ -112,7 +126,7 @@ const DivisionList: React.FC = () => {
     
     setLoading(true);
     try {
-      let url = `${API_URL}/divisions/?organization_id=${selectedOrg}`;
+      let url = `/divisions/?organization_id=${selectedOrg}&include_inactive=${includeInactive}`;
       
       // Добавляем фильтры
       if (parentDivision !== null) {
@@ -121,19 +135,8 @@ const DivisionList: React.FC = () => {
         url += '&parent_id=null';
       }
       
-      if (!includeInactive) {
-        url += '&include_inactive=false';
-      } else {
-        url += '&include_inactive=true';
-      }
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Ошибка при загрузке отделов');
-      }
-      
-      const data = await response.json();
-      setDivisions(data);
+      const response = await api.get(url);
+      setDivisions(response.data);
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке отделов');
     } finally {
@@ -147,21 +150,8 @@ const DivisionList: React.FC = () => {
     
     setLoading(true);
     try {
-      let url = `${API_URL}/divisions/tree?organization_id=${selectedOrg}`;
-      
-      if (!includeInactive) {
-        url += '&include_inactive=false';
-      } else {
-        url += '&include_inactive=true';
-      }
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Ошибка при загрузке дерева отделов');
-      }
-      
-      const data = await response.json();
-      setTreeData(data);
+      const response = await api.get(`/divisions/tree?organization_id=${selectedOrg}&include_inactive=${includeInactive}`);
+      setTreeData(response.data);
     } catch (err: any) {
       setError(err.message || 'Ошибка при загрузке дерева отделов');
     } finally {
@@ -184,13 +174,7 @@ const DivisionList: React.FC = () => {
     }
     
     try {
-      const response = await fetch(`${API_URL}/divisions/${divisionId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Ошибка при удалении отдела');
-      }
+      await api.delete(`/divisions/${divisionId}`);
       
       // Обновляем список отделов
       fetchDivisions();
@@ -215,6 +199,17 @@ const DivisionList: React.FC = () => {
   // Сброс формы
   const resetForm = () => {
     setSelectedDivision(null);
+    setFormData({
+      id: 0,
+      name: '',
+      code: '',
+      description: '',
+      is_active: true,
+      level: 0,
+      organization_id: Number(selectedOrg) || 0,
+      parent_id: null
+    });
+    setEditId(null);
   };
   
   // Генерация элементов дерева
@@ -279,6 +274,80 @@ const DivisionList: React.FC = () => {
   const handleOrganizationChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     setSelectedOrg(e.target.value as number | '');
     setParentDivision(null);
+  };
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target;
+    if (name) {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+  };
+
+  const handleCreateDivision = async () => {
+    try {
+      if (!formData.organization_id) {
+        formData.organization_id = Number(selectedOrg);
+      }
+      
+      setLoading(true);
+      let url = '/divisions/';
+      let params = {};
+      
+      if (formData.parent_id) {
+        params = { parent_id: formData.parent_id };
+      }
+      
+      await api.post(url, formData, { params });
+      setOpenCreate(false);
+      resetForm();
+      fetchDivisions();
+      if (showTree) {
+        fetchDivisionTree();
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error('Ошибка при создании отдела:', err);
+      setError('Не удалось создать отдел');
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateDivision = async () => {
+    if (!editId) return;
+    
+    try {
+      setLoading(true);
+      await api.put(`/divisions/${editId}`, formData);
+      setOpenEdit(false);
+      resetForm();
+      fetchDivisions();
+      if (showTree) {
+        fetchDivisionTree();
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error('Ошибка при обновлении отдела:', err);
+      setError('Не удалось обновить отдел');
+      setLoading(false);
+    }
+  };
+
+  const handleEditClick = (division: Division) => {
+    setFormData({
+      id: division.id,
+      name: division.name,
+      code: division.code || '',
+      description: division.description || '',
+      is_active: division.is_active,
+      level: division.level,
+      organization_id: division.organization_id,
+      parent_id: division.parent_id
+    });
+    setEditId(division.id);
+    setOpenEdit(true);
   };
 
   return (
@@ -419,9 +488,13 @@ const DivisionList: React.FC = () => {
                 <CircularProgress />
               </Box>
             ) : treeData.length > 0 ? (
-              <List>
+              <TreeView
+                defaultCollapseIcon={<ExpandMore />}
+                defaultExpandIcon={<ChevronRight />}
+                sx={{ flexGrow: 1, maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}
+              >
                 {renderTree(treeData)}
-              </List>
+              </TreeView>
             ) : (
               <Alert severity="info">Нет данных для отображения</Alert>
             )}
@@ -502,25 +575,160 @@ const DivisionList: React.FC = () => {
       )}
       
       {/* Модальное окно создания отдела */}
-      <DivisionEditModal
-        open={openCreate}
-        division={null}
-        organizationId={Number(selectedOrg)}
-        onClose={() => setOpenCreate(false)}
-        onSave={handleSaveDivision}
-      />
+      <Dialog open={openCreate} onClose={() => setOpenCreate(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Создать новый отдел</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            name="name"
+            label="Название отдела"
+            fullWidth
+            variant="outlined"
+            value={formData.name}
+            onChange={handleFormChange}
+            required
+          />
+          <TextField
+            margin="dense"
+            name="code"
+            label="Код отдела"
+            fullWidth
+            variant="outlined"
+            value={formData.code}
+            onChange={handleFormChange}
+          />
+          <TextField
+            margin="dense"
+            name="description"
+            label="Описание"
+            fullWidth
+            variant="outlined"
+            value={formData.description}
+            onChange={handleFormChange}
+            multiline
+            rows={3}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="create-org-label">Организация</InputLabel>
+            <Select
+              labelId="create-org-label"
+              name="organization_id"
+              value={formData.organization_id || ''}
+              onChange={handleFormChange}
+              label="Организация"
+            >
+              {organizations.map((org) => (
+                <MenuItem key={org.id} value={org.id}>{org.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="create-parent-label">Родительский отдел</InputLabel>
+            <Select
+              labelId="create-parent-label"
+              name="parent_id"
+              value={formData.parent_id || ''}
+              onChange={handleFormChange}
+              label="Родительский отдел"
+            >
+              <MenuItem value=""><em>Нет (корневой отдел)</em></MenuItem>
+              {divisions.map((div) => (
+                <MenuItem key={div.id} value={div.id}>{div.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenCreate(false)}>Отмена</Button>
+          <Button 
+            onClick={handleCreateDivision} 
+            variant="contained"
+            disabled={!formData.name || !formData.organization_id}
+          >
+            Создать
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Модальное окно редактирования отдела */}
-      <DivisionEditModal
-        open={openEdit}
-        division={selectedDivision}
-        organizationId={Number(selectedOrg)}
-        onClose={() => {
-          setOpenEdit(false);
-          setSelectedDivision(null);
-        }}
-        onSave={handleSaveDivision}
-      />
+      <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Редактировать отдел</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            name="name"
+            label="Название отдела"
+            fullWidth
+            variant="outlined"
+            value={formData.name}
+            onChange={handleFormChange}
+            required
+          />
+          <TextField
+            margin="dense"
+            name="code"
+            label="Код отдела"
+            fullWidth
+            variant="outlined"
+            value={formData.code}
+            onChange={handleFormChange}
+          />
+          <TextField
+            margin="dense"
+            name="description"
+            label="Описание"
+            fullWidth
+            variant="outlined"
+            value={formData.description}
+            onChange={handleFormChange}
+            multiline
+            rows={3}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="edit-status-label">Статус</InputLabel>
+            <Select
+              labelId="edit-status-label"
+              name="is_active"
+              value={formData.is_active}
+              onChange={handleFormChange}
+              label="Статус"
+            >
+              <MenuItem value={true}>Активен</MenuItem>
+              <MenuItem value={false}>Неактивен</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="edit-parent-label">Родительский отдел</InputLabel>
+            <Select
+              labelId="edit-parent-label"
+              name="parent_id"
+              value={formData.parent_id || ''}
+              onChange={handleFormChange}
+              label="Родительский отдел"
+            >
+              <MenuItem value=""><em>Нет (корневой отдел)</em></MenuItem>
+              {divisions
+                .filter(div => div.id !== editId) // Исключаем текущий отдел
+                .map((div) => (
+                  <MenuItem key={div.id} value={div.id}>{div.name}</MenuItem>
+                ))
+              }
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEdit(false)}>Отмена</Button>
+          <Button 
+            onClick={handleUpdateDivision} 
+            variant="contained"
+            disabled={!formData.name}
+          >
+            Сохранить
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
