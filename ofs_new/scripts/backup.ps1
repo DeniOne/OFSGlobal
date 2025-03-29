@@ -128,7 +128,7 @@ try {
         Get-ChildItem -Path $backupDir -Filter "*.zip" | 
             Sort-Object LastWriteTime -Descending | 
             Select-Object -First 5 | 
-            Format-Table @{L='Имя файла';E={$_.Name}}, @{L='Дата создания';E={$_.LastWriteTime}}, @{L='Размер (МБ)';E={"{0:N2}" -f ($_.Length / 1MB)}}
+            Format-Table @{L='Имя';E={$_.Name}}, @{L='Дата';E={$_.LastWriteTime}}, @{L='Размер (МБ)';E={"{0:N2}" -f ($_.Length / 1MB)}}
     }
 }
 catch {

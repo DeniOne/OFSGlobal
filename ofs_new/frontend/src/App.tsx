@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage';
 import OrganizationStructurePage from './pages/OrganizationStructurePage';
 import FunctionalRelationsPage from './pages/FunctionalRelationsPage';
 import DivisionsPage from './pages/divisions/DivisionsPage';
+import PositionsPage from './pages/positions/PositionsPage';
 
 // Placeholder компоненты для других страниц
 function Dashboard() { return <div>Dashboard Page</div>; }
@@ -47,6 +48,7 @@ const App: React.FC = () => {
             <Route path="employees" element={<Employees />} />
             <Route path="reports" element={<Reports />} />
             <Route path="divisions" element={<DivisionsPage />} />
+            <Route path="positions" element={<PositionsPage />} />
             <Route path="departments" element={<Navigate to="/divisions" replace />} />
             <Route path="*" element={<NotFound />} />
           </Route>
