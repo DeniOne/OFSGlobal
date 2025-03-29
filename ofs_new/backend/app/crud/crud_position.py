@@ -1,5 +1,7 @@
 from typing import List, Dict, Any, Optional, Union
 from sqlalchemy.orm import Session
+from sqlalchemy import select, and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.base import CRUDBase
 from app.models.position import Position
@@ -13,26 +15,55 @@ class CRUDPosition(CRUDBase[Position, PositionCreate, PositionUpdate]):
     
     def get_by_name(self, db: Session, *, name: str) -> Optional[Position]:
         """
-        Получить должность по названию.
+        Получить должность по названию (синхронный метод).
         """
         return db.query(Position).filter(Position.name == name).first()
     
-    def get_multi(
-        self, db: Session, *, skip: int = 0, limit: int = 100, 
-        name: Optional[str] = None, active: Optional[bool] = None
+    async def get_by_name_async(self, db: AsyncSession, *, name: str) -> Optional[Position]:
+        """
+        Получить должность по названию (асинхронный метод).
+        """
+        result = await db.execute(
+            select(Position).where(Position.name == name)
+        )
+        return result.scalars().first()
+    
+    async def get_multi(
+        self, db: AsyncSession, *, skip: int = 0, limit: int = 100, 
+        name: Optional[str] = None, active: Optional[bool] = None,
+        organization_id: Optional[int] = None, include_inactive: bool = False
     ) -> List[Position]:
         """
-        Получить список должностей с возможностью фильтрации.
+        Получить список должностей с возможностью фильтрации (асинхронный метод).
         """
-        query = db.query(self.model)
+        filters = []
         
         if name:
-            query = query.filter(Position.name.ilike(f"%{name}%"))
+            filters.append(Position.name.ilike(f"%{name}%"))
         
         if active is not None:
-            query = query.filter(Position.is_active == active)
+            filters.append(Position.is_active == active)
+        elif not include_inactive:
+            filters.append(Position.is_active == True)
+            
+        if organization_id is not None:
+            filters.append(Position.organization_id == organization_id)
         
-        return query.offset(skip).limit(limit).all()
+        if filters:
+            result = await db.execute(
+                select(Position)
+                .where(and_(*filters))
+                .offset(skip)
+                .limit(limit)
+            )
+        else:
+            result = await db.execute(
+                select(Position)
+                .offset(skip)
+                .limit(limit)
+            )
+        
+        return result.scalars().all()
 
 
 crud_position = CRUDPosition(Position) 

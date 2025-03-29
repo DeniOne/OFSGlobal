@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
 from app.api import deps
-from app.crud import crud_employee, crud_position, crud_division
-from app.models.employee import Employee
-from app.schemas.employee import EmployeeCreate, Employee as EmployeeSchema
+from app.crud import crud_position, crud_division
+from app.models.staff import Staff
+from app.schemas.staff import StaffCreate, Staff as StaffSchema
 
 router = APIRouter()
 
@@ -35,12 +35,12 @@ def webhook(data: Dict[Any, Any], db: Session = Depends(deps.get_db)):
         department_value = division if division else department
         
         # Создание объекта сотрудника
-        employee_data = EmployeeCreate(
+        staff_data = StaffCreate(
             name=data.get("name", ""),
             email=data.get("email", ""),
             phone=data.get("phone", ""),
             position=data.get("position", ""),
-            department=department_value,  # Используем вычисленное значение
+            division=department_value,  # Используем вычисленное значение
             division_id=division_id,  # Добавляем поддержку division_id
             telegram_id=data.get("telegram_id", ""),
             organization_id=data.get("organization_id", 1),
@@ -49,12 +49,12 @@ def webhook(data: Dict[Any, Any], db: Session = Depends(deps.get_db)):
         )
         
         # Сохранение в БД
-        employee = crud_employee.create_employee(db=db, obj_in=employee_data)
+        staff = crud.staff.create(db=db, obj_in=staff_data)
         
         return {
             "status": "success", 
             "message": "Сотрудник успешно зарегистрирован", 
-            "employee_id": employee.id
+            "staff_id": staff.id
         }
         
     except Exception as e:

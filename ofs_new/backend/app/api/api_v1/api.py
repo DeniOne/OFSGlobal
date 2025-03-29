@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import RedirectResponse
 
 from app.api.api_v1.endpoints import (
     items, login, users, organizations,
@@ -30,3 +31,20 @@ api_router.include_router(positions.router, prefix="/positions", tags=["position
 api_router.include_router(division.router, prefix="/divisions", tags=["divisions"])
 api_router.include_router(staff.router, prefix="/staff", tags=["staff"])
 api_router.include_router(functional_relations.router, prefix="/functional-relations-v2", tags=["functional-relations-v2"])
+
+# Редиректы для обратной совместимости
+@api_router.get("/employees/{path:path}", include_in_schema=False)
+async def employees_redirect(path: str, request: Request):
+    return RedirectResponse(url=f"/api/v1/staff/{path}")
+
+@api_router.get("/departments/{path:path}", include_in_schema=False)
+async def departments_redirect(path: str, request: Request):
+    return RedirectResponse(url=f"/api/v1/divisions/{path}")
+
+@api_router.get("/employees", include_in_schema=False)
+async def employees_root_redirect(request: Request):
+    return RedirectResponse(url="/api/v1/staff/")
+
+@api_router.get("/departments", include_in_schema=False)
+async def departments_root_redirect(request: Request):
+    return RedirectResponse(url="/api/v1/divisions/")
