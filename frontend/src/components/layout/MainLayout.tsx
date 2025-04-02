@@ -122,7 +122,7 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
 }));
 
 interface MainLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 interface LogoProps {
@@ -174,7 +174,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         <MainContainer>
           {/* Используем Outlet из react-router для рендеринга вложенных маршрутов */}
           <Outlet />
-          {children}
         </MainContainer>
       </Box>
     </Box>

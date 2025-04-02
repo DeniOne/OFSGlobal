@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -11,28 +10,20 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  IconButton,
   Chip,
   CircularProgress,
   Alert,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   TextField,
-  InputAdornment
+  InputAdornment,
+  Link
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Search as SearchIcon,
   Business as BusinessIcon,
-  Person as PersonIcon,
   Work as WorkIcon
 } from '@mui/icons-material';
-import { API_URL } from '../../config';
+import api from '../../services/api';
 
 // Типы данных
 interface StaffMember {
@@ -44,24 +35,37 @@ interface StaffMember {
     id: number;
     name: string;
   };
-  parent?: {
-    id: number;
-    name: string;
-  };
   is_active: boolean;
   phone?: string;
   email?: string;
 }
 
+// Интерфейс для данных с API
+interface StaffApiData {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  middle_name?: string;
+  phone?: string;
+  description?: string;
+  is_active: boolean;
+  organization_id?: number;
+  primary_organization_id?: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Organization {
   id: number;
   name: string;
+  code: string;
+  description?: string;
+  org_type: string;
 }
 
 // Компонент списка сотрудников
 const StaffList: React.FC = () => {
-  const navigate = useNavigate();
-  
   // Состояния
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [filteredStaff, setFilteredStaff] = useState<StaffMember[]>([]);
@@ -70,12 +74,6 @@ const StaffList: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
-  // Состояния для диалога удаления
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
-  const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   // Загрузка данных при первом рендере
   useEffect(() => {
@@ -88,18 +86,45 @@ const StaffList: React.FC = () => {
     filterStaff();
   }, [staffList, selectedOrg, searchQuery]);
   
+  // Преобразование данных API в формат компонента
+  const transformApiData = (apiData: StaffApiData[], orgs: Organization[]): StaffMember[] => {
+    return apiData.map(staff => {
+      // Находим организацию по ID
+      const organization = staff.organization_id 
+        ? orgs.find(org => org.id === staff.organization_id) 
+        : null;
+        
+      return {
+        id: staff.id,
+        name: `${staff.last_name} ${staff.first_name}${staff.middle_name ? ` ${staff.middle_name}` : ''}`,
+        position: staff.description || 'Должность не указана',
+        division: 'Отдел не указан', // Данных о подразделении нет в API
+        organization: organization 
+          ? { id: organization.id, name: organization.name }
+          : { id: 0, name: 'Не указана' },
+        is_active: staff.is_active,
+        phone: staff.phone,
+        email: staff.email
+      };
+    });
+  };
+  
   // Загрузить список сотрудников
   const fetchStaff = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`${API_URL}/staff/`);
-      if (!response.ok) throw new Error('Не удалось загрузить список сотрудников');
+      const response = await api.get('/staff/');
+      const orgResponse = await api.get('/organizations/');
       
-      const data = await response.json();
-      setStaffList(data);
+      const staffData = response.data as StaffApiData[];
+      const orgsData = orgResponse.data as Organization[];
+      
+      const transformedData = transformApiData(staffData, orgsData);
+      setStaffList(transformedData);
     } catch (err: any) {
+      console.error('Ошибка при загрузке данных:', err);
       setError(err.message || 'Ошибка при загрузке данных');
     } finally {
       setLoading(false);
@@ -109,11 +134,8 @@ const StaffList: React.FC = () => {
   // Загрузить список организаций для фильтра
   const fetchOrganizations = async () => {
     try {
-      const response = await fetch(`${API_URL}/organizations/`);
-      if (!response.ok) throw new Error('Не удалось загрузить список организаций');
-      
-      const data = await response.json();
-      setOrganizations(data);
+      const response = await api.get('/organizations/');
+      setOrganizations(response.data);
     } catch (err) {
       console.error('Ошибка при загрузке организаций:', err);
     }
@@ -143,55 +165,11 @@ const StaffList: React.FC = () => {
     setFilteredStaff(filtered);
   };
   
-  // Обработчики событий
-  const handleAddStaff = () => {
-    navigate('/staff/new');
-  };
-  
-  const handleEditStaff = (id: number) => {
-    navigate(`/staff/${id}`);
-  };
-  
-  const handleOpenDeleteDialog = (staff: StaffMember) => {
-    setStaffToDelete(staff);
-    setDeleteDialogOpen(true);
-    setDeleteError(null);
-  };
-  
-  const handleCloseDeleteDialog = () => {
-    setDeleteDialogOpen(false);
-    setStaffToDelete(null);
-    setDeleteError(null);
-  };
-  
-  const handleDeleteStaff = async () => {
-    if (!staffToDelete) return;
-    
-    setDeleteLoading(true);
-    setDeleteError(null);
-    
-    try {
-      const response = await fetch(`${API_URL}/staff/${staffToDelete.id}`, {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) throw new Error('Не удалось удалить сотрудника');
-      
-      // Обновляем список после удаления
-      setStaffList(prevList => prevList.filter(staff => staff.id !== staffToDelete.id));
-      handleCloseDeleteDialog();
-    } catch (err: any) {
-      setDeleteError(err.message || 'Ошибка при удалении сотрудника');
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-  
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
   
-  const handleOrgFilter = (orgId: number | null) => {
+  const handleOrgFilter = (orgId: number) => {
     setSelectedOrg(orgId === selectedOrg ? null : orgId);
   };
   
@@ -204,7 +182,8 @@ const StaffList: React.FC = () => {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={handleAddStaff}
+          component="a"
+          href="/staff/new"
         >
           Добавить сотрудника
         </Button>
@@ -277,15 +256,19 @@ const StaffList: React.FC = () => {
                   <TableCell>Должность</TableCell>
                   <TableCell>Отдел</TableCell>
                   <TableCell>Организация</TableCell>
-                  <TableCell>Руководитель</TableCell>
                   <TableCell>Статус</TableCell>
+                  <TableCell>Email</TableCell>
                   <TableCell>Действия</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredStaff.map(staff => (
                   <TableRow key={staff.id}>
-                    <TableCell>{staff.name}</TableCell>
+                    <TableCell>
+                      <Link href={`/staff/${staff.id}/edit`} sx={{ fontWeight: 'medium', textDecoration: 'none' }}>
+                        {staff.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <WorkIcon fontSize="small" color="action" />
@@ -295,38 +278,24 @@ const StaffList: React.FC = () => {
                     <TableCell>{staff.division}</TableCell>
                     <TableCell>{staff.organization.name}</TableCell>
                     <TableCell>
-                      {staff.parent ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <PersonIcon fontSize="small" color="action" />
-                          {staff.parent.name}
-                        </Box>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>
                       <Chip
                         label={staff.is_active ? 'Активен' : 'Неактивен'}
                         color={staff.is_active ? 'success' : 'default'}
                         size="small"
                       />
                     </TableCell>
+                    <TableCell>{staff.email || '-'}</TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex' }}>
-                        <IconButton
-                          color="primary"
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button 
+                          variant="outlined" 
+                          color="primary" 
                           size="small"
-                          onClick={() => handleEditStaff(staff.id)}
+                          component="a"
+                          href={`/staff/${staff.id}/edit`}
                         >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          size="small"
-                          onClick={() => handleOpenDeleteDialog(staff)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                          Открыть
+                        </Button>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -336,43 +305,6 @@ const StaffList: React.FC = () => {
           </TableContainer>
         )}
       </Paper>
-      
-      {/* Диалог подтверждения удаления */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleCloseDeleteDialog}
-      >
-        <DialogTitle>Подтверждение удаления</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Вы действительно хотите удалить сотрудника {staffToDelete?.name}?
-            Это действие нельзя будет отменить.
-          </DialogContentText>
-          
-          {deleteError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleCloseDeleteDialog}
-            color="primary"
-            disabled={deleteLoading}
-          >
-            Отмена
-          </Button>
-          <Button
-            onClick={handleDeleteStaff}
-            color="error"
-            disabled={deleteLoading}
-            startIcon={deleteLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
-          >
-            {deleteLoading ? 'Удаление...' : 'Удалить'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

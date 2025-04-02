@@ -39,7 +39,7 @@ const App: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/landing" element={<LandingPage />} />
-        <Route path="/" element={<MainLayout><Outlet /></MainLayout>}>
+        <Route path="/" element={<MainLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="telegram-bot" element={<ProtectedRoute><TelegramBotPage /></ProtectedRoute>} />
