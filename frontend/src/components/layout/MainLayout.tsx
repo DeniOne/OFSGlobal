@@ -122,7 +122,6 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
 }));
 
 interface MainLayoutProps {
-  children?: React.ReactNode;
 }
 
 interface LogoProps {
@@ -132,7 +131,7 @@ interface LogoProps {
   onClick: () => void;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+const MainLayout: React.FC<MainLayoutProps> = () => {
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
